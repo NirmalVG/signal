@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "fastapi": {
+      "source": "fastapi/fastapi",
+      "sourceType": "github",
+      "skillPath": "fastapi/.agents/skills/fastapi/SKILL.md",
+      "computedHash": "187b2e06c41cdb6c6beeab15e6db4aeb1bf62f57735974646ad5646af8aacc66"
+    },
+    "supabase": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase/SKILL.md",
+      "computedHash": "a6260582f48df8ba53380bb9b9e870ed2ae5fe147799e90ed783b8aa25167d50"
+    },
+    "tree-sitter": {
+      "source": "plurigrid/asi",
+      "sourceType": "github",
+      "skillPath": "skills/tree-sitter/SKILL.md",
+      "computedHash": "81c90ddaa1d31eec0a2ac5f8ca43c85e3c19f067b73d9fb534ff6a0031b97f13"
+    }
+  }
+}
