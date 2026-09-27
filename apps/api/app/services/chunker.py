@@ -29,25 +29,28 @@ def _line_windows(lines: list[str], size: int = CODE_WINDOW_SIZE):
         yield start + 1, start + len(window), "\n".join(window)
 
 
-def chunk_code_file(path: Path) -> list[dict]:
+def chunk_code_file(path: Path, root: Path) -> list[dict]:
     """
     Two independent, deliberately overlapping chunk sets:
       - code_semantic: one chunk per function/class, via tree-sitter definitions
       - code_window: fixed 200-line slices across the whole file
 
-    Overlap is intentional — hybrid retrieval benefits from having both a
-    "this is exactly the function you asked about" chunk and a
-    "this is the surrounding context" chunk available to choose between.
+    file_path is stored RELATIVE to the repo root (e.g. "app/layout.tsx"),
+    not the absolute extraction path — citations shown to a user should
+    never leak internal storage details like a repo_id folder.
     """
     source_bytes = path.read_bytes()
     lines = source_bytes.decode(errors="ignore").splitlines()
+    # .as_posix() forces forward slashes regardless of OS, so citations look
+    # identical whether this runs on your Windows dev machine or a Linux host.
+    rel_path = path.relative_to(root).as_posix()
     chunks: list[dict] = []
 
     for d in extract_definitions(path):
         start, end = d["start_line"], d["end_line"]
         text = "\n".join(lines[start - 1:end])
         chunks.append({
-            "file_path": str(path),
+            "file_path": rel_path,
             "start_line": start,
             "end_line": end,
             "text": text,
@@ -56,7 +59,7 @@ def chunk_code_file(path: Path) -> list[dict]:
 
     for start, end, text in _line_windows(lines):
         chunks.append({
-            "file_path": str(path),
+            "file_path": rel_path,
             "start_line": start,
             "end_line": end,
             "text": text,
@@ -66,18 +69,17 @@ def chunk_code_file(path: Path) -> list[dict]:
     return chunks
 
 
-def chunk_doc_file(path: Path) -> list[dict]:
+def chunk_doc_file(path: Path, root: Path) -> list[dict]:
     """
     Paragraph-based chunking for .md/.mdx/.txt files. Paragraphs (split on
-    blank lines) are merged together until they approach DOC_CHUNK_MAX_CHARS,
-    so we don't end up with one chunk per single sentence.
+    blank lines) are merged together until they approach DOC_CHUNK_MAX_CHARS.
 
     Note: line numbers here are approximate — collapsing on "\n\n" loses
     exact blank-line counts when a file has multiple consecutive blank
-    lines. Good enough for citing "roughly where this came from" in an
-    MVP; not pixel-precise the way tree-sitter's code line numbers are.
+    lines. Good enough for citing "roughly where this came from."
     """
     text = path.read_text(errors="ignore")
+    rel_path = path.relative_to(root).as_posix()
     raw_paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
 
     chunks: list[dict] = []
@@ -91,7 +93,7 @@ def chunk_doc_file(path: Path) -> list[dict]:
 
         if len(candidate) > DOC_CHUNK_MAX_CHARS and buffer:
             chunks.append({
-                "file_path": str(path),
+                "file_path": rel_path,
                 "start_line": buffer_start_line,
                 "end_line": current_line - 1,
                 "text": buffer,
@@ -106,7 +108,7 @@ def chunk_doc_file(path: Path) -> list[dict]:
 
     if buffer:
         chunks.append({
-            "file_path": str(path),
+            "file_path": rel_path,
             "start_line": buffer_start_line,
             "end_line": current_line - 1,
             "text": buffer,
@@ -124,9 +126,9 @@ def chunk_repo(root: Path) -> list[dict]:
         if path.is_dir() or _is_rejected(path):
             continue
         if path.suffix in EXTENSION_LANGUAGE_MAP:
-            chunks.extend(chunk_code_file(path))
+            chunks.extend(chunk_code_file(path, root))
         elif path.suffix in DOC_EXTENSIONS:
-            chunks.extend(chunk_doc_file(path))
+            chunks.extend(chunk_doc_file(path, root))
 
     return chunks
 
