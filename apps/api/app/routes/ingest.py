@@ -1,18 +1,21 @@
+# Place this file at: apps/api/app/routes/ingest.py
+
 import shutil
 import uuid
 import zipfile
 from pathlib import Path
 
 import aiofiles
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 
 from app.core.supabase import supabase
+from app.services.indexer import run_indexing
 
 router = APIRouter()
 
 UPLOAD_DIR = Path("data/uploads")
 EXTRACT_DIR = Path("data/repos")
-MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200MB, matches MAX_UPLOAD_MB from AGENTS.md
+MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200MB
 
 
 def safe_extract(zip_path: Path, dest: Path) -> None:
@@ -28,8 +31,21 @@ def safe_extract(zip_path: Path, dest: Path) -> None:
         zf.extractall(dest)
 
 
+def find_repo_root(extract_path: Path) -> Path:
+    """
+    Most zip tools wrap contents in a folder matching the archive name
+    (e.g. test-repo.zip -> test-repo/), but not all do. If extraction
+    produced exactly one top-level directory, treat that as the real
+    repo root; otherwise assume source files sit directly at extract_path.
+    """
+    entries = list(extract_path.iterdir())
+    if len(entries) == 1 and entries[0].is_dir():
+        return entries[0]
+    return extract_path
+
+
 @router.post("/ingest")
-async def ingest_repo(file: UploadFile = File(...)):
+async def ingest_repo(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are accepted")
 
@@ -48,16 +64,14 @@ async def ingest_repo(file: UploadFile = File(...)):
                 raise HTTPException(status_code=413, detail="Archive too large")
             await out_file.write(chunk)
 
-    result = (
-        supabase.table("repos")
-        .insert({"id": repo_id, "name": repo_name, "status": "processing"})
-        .execute()
-    )
+    supabase.table("repos").insert(
+        {"id": repo_id, "name": repo_name, "status": "processing"}
+    ).execute()
 
     extract_path = EXTRACT_DIR / repo_id
     try:
         safe_extract(zip_path, extract_path)
-    except (zipfile.BadZipFile, HTTPException) as e:
+    except (zipfile.BadZipFile, HTTPException):
         supabase.table("repos").update({"status": "failed"}).eq("id", repo_id).execute()
         shutil.rmtree(extract_path, ignore_errors=True)
         raise
@@ -65,5 +79,8 @@ async def ingest_repo(file: UploadFile = File(...)):
         zip_path.unlink(missing_ok=True)
 
     supabase.table("repos").update({"status": "extracted"}).eq("id", repo_id).execute()
+
+    repo_root = find_repo_root(extract_path)
+    background_tasks.add_task(run_indexing, repo_id, repo_root)
 
     return {"repo_id": repo_id, "name": repo_name, "status": "extracted"}

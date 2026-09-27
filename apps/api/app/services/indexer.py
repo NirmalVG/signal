@@ -1,3 +1,6 @@
+# Place this file at: apps/api/app/services/indexer.py
+
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.core.supabase import supabase
@@ -36,6 +39,32 @@ def index_repo(repo_id: str, repo_path: Path) -> dict:
     return {"chunks_indexed": len(rows)}
 
 
+def run_indexing(repo_id: str, repo_path: Path) -> None:
+    """
+    Background-task entrypoint called by /api/ingest after extraction.
+    Drives repos.status through: indexing -> indexed (or -> failed).
+
+    This runs in a thread pool (FastAPI/Starlette does this automatically
+    for non-async background tasks), so a slow embedding run never blocks
+    the event loop from serving other requests in the meantime.
+    """
+    try:
+        supabase.table("repos").update({"status": "indexing"}).eq("id", repo_id).execute()
+
+        result = index_repo(repo_id, repo_path)
+
+        supabase.table("repos").update({
+            "status": "indexed",
+            "ingested_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", repo_id).execute()
+
+        print(f"[ingest] repo {repo_id} indexed: {result}")
+
+    except Exception as e:
+        supabase.table("repos").update({"status": "failed"}).eq("id", repo_id).execute()
+        print(f"[ingest] repo {repo_id} failed: {e}")
+
+
 def search_chunks(repo_id: str, question: str, match_count: int = 5) -> list[dict]:
     """Embed a question as 'query' and return the most similar stored chunks."""
     query_embedding = embed_texts([question], input_type="query")[0]
@@ -50,18 +79,3 @@ def search_chunks(repo_id: str, question: str, match_count: int = 5) -> list[dic
     ).execute()
 
     return result.data
-
-
-if __name__ == "__main__":
-    # Update these two values to match your test repo before running.
-    repo_id = "c56cf2e2-1608-4ef2-b60f-1317e5e9b40e"
-    repo_path = Path(f"data/repos/{repo_id}/test-repo")
-
-    print("Indexing...")
-    result = index_repo(repo_id, repo_path)
-    print(result)
-
-    print("\nSearching for: 'root layout component'")
-    for r in search_chunks(repo_id, "root layout component"):
-        preview = r["text"][:60].replace("\n", " ")
-        print(f"  [{r['similarity']:.3f}] [{r['kind']}] {r['file_path']}:{r['line_number']}  {preview!r}")
