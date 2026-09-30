@@ -13,8 +13,8 @@ from app.services.indexer import search_chunks
 _groq_client = Groq(api_key=settings.groq_api_key)
 
 GENERATION_MODEL = "openai/gpt-oss-120b"
-SIMILARITY_FLOOR = 0.3   # reject chunks below this before offering them as context
-MAX_CONTEXT_CHUNKS = 5
+SIMILARITY_FLOOR = 0.2   # reject chunks below this before offering them as context
+MAX_CONTEXT_CHUNKS = 8
 
 SYSTEM_PROMPT = """You are Signal, an AI assistant that answers questions about a \
 codebase using ONLY the provided context chunks. Rules:

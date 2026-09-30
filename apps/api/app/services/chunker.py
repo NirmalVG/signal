@@ -78,7 +78,7 @@ def chunk_doc_file(path: Path, root: Path) -> list[dict]:
     exact blank-line counts when a file has multiple consecutive blank
     lines. Good enough for citing "roughly where this came from."
     """
-    text = path.read_text(errors="ignore")
+    text = path.read_text(encoding="utf-8", errors="ignore")
     rel_path = path.relative_to(root).as_posix()
     raw_paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
 

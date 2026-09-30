@@ -5,7 +5,8 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     groq_api_key: str = ""
     signal_api_key: str = ""
-    voyage_api_key: str = "" 
+    voyage_api_key: str = ""
+    jina_api_key: str = ""
 
     class Config:
         env_file = ".env"
