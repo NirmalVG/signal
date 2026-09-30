@@ -2,19 +2,23 @@
 
 // TEMPORARY sanity check for the hooks — delete before real UI work.
 import { useState } from "react"
-import { useAsk } from "@/hooks/use-ask"
+import { useChat } from "@/hooks/use-chat"
 import { useIngest } from "@/hooks/use-ingest"
 import { useRepos } from "@/hooks/use-repos"
 import { useRepoStatus } from "@/hooks/use-repo-status"
+import { useWorkspaceStore } from "@/store/workspace-store"
 
 export default function DevPage() {
-  const [repoId, setRepoId] = useState<string | null>(null)
   const [question, setQuestion] = useState("")
+
+  // Active repo now lives in the Zustand store, not local state.
+  const repoId = useWorkspaceStore((s) => s.activeRepoId)
+  const setActiveRepo = useWorkspaceStore((s) => s.setActiveRepo)
 
   const repos = useRepos()
   const status = useRepoStatus(repoId)
   const ingest = useIngest()
-  const ask = useAsk()
+  const chat = useChat(repoId)
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 p-8 font-mono text-sm">
@@ -23,8 +27,8 @@ export default function DevPage() {
         {repos.data?.map((r) => (
           <button
             key={r.id}
-            onClick={() => setRepoId(r.id)}
-            className="block underline"
+            onClick={() => setActiveRepo(r.id)}
+            className={`block underline ${r.id === repoId ? "font-bold" : ""}`}
           >
             {r.name} — {r.status}
           </button>
@@ -39,7 +43,9 @@ export default function DevPage() {
           onChange={(e) => {
             const file = e.target.files?.[0]
             if (file)
-              ingest.mutate(file, { onSuccess: (d) => setRepoId(d.repo_id) })
+              ingest.mutate(file, {
+                onSuccess: (d) => setActiveRepo(d.repo_id),
+              })
           }}
         />
         {ingest.isPending && <p>uploading…</p>}
@@ -59,23 +65,48 @@ export default function DevPage() {
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && repoId && question.trim()) {
+              chat.send(question)
+              setQuestion("")
+            }
+          }}
           className="w-full border p-2"
+          placeholder="Ask about the selected repo, press Enter"
         />
         <button
-          disabled={!repoId || !question || ask.isPending}
-          onClick={() => ask.mutate({ repoId: repoId!, question })}
+          disabled={!repoId || !question.trim()}
+          onClick={() => {
+            chat.send(question)
+            setQuestion("")
+          }}
           className="mt-2 border px-3 py-1"
         >
-          {ask.isPending ? "thinking…" : "Ask"}
+          Ask
         </button>
-        {ask.error && <p className="text-error">{ask.error.message}</p>}
-        {ask.data && (
-          <pre className="mt-2 whitespace-pre-wrap">
-            {ask.data.answer}
-            {"\n\n"}confidence {ask.data.confidence.toFixed(2)} ·{" "}
-            {ask.data.latency_ms}ms · {ask.data.context.length} chunks
-          </pre>
-        )}
+        {chat.isPending && <p className="mt-2">(answer in flight…)</p>}
+
+        {chat.messages.map((m) => (
+          <div key={m.id} className="mt-3 border-l-2 pl-3">
+            {m.role === "user" ? (
+              <pre className="whitespace-pre-wrap">▸ {m.content}</pre>
+            ) : (
+              <>
+                <pre
+                  className={`whitespace-pre-wrap ${m.status === "error" ? "text-error" : ""}`}
+                >
+                  {m.status === "pending" ? "… thinking" : `◂ ${m.content}`}
+                </pre>
+                {m.status === "done" && (
+                  <p className="text-text-muted">
+                    confidence {m.confidence.toFixed(2)} · {m.latencyMs}ms ·{" "}
+                    {m.context.length} chunks
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        ))}
       </section>
     </main>
   )
