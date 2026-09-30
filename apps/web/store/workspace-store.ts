@@ -23,6 +23,7 @@ interface WorkspaceState {
   messagesByRepo: Record<string, ChatMessage[]>
   selectedCitation: Citation | null
   sidebarCollapsed: boolean
+  mobileNavOpen: boolean
 
   setActiveRepo: (repoId: string | null) => void
   addMessage: (repoId: string, message: ChatMessage) => void
@@ -34,6 +35,7 @@ interface WorkspaceState {
   clearConversation: (repoId: string) => void
   selectCitation: (citation: Citation | null) => void
   toggleSidebar: () => void
+  setMobileNav: (open: boolean) => void
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()((set) => ({
@@ -41,11 +43,12 @@ export const useWorkspaceStore = create<WorkspaceState>()((set) => ({
   messagesByRepo: {},
   selectedCitation: null,
   sidebarCollapsed: false,
+  mobileNavOpen: false,
 
   setActiveRepo: (repoId) =>
     // Switching repos closes the drawer: a citation from repo A must not
     // stay open while you're looking at repo B.
-    set({ activeRepoId: repoId, selectedCitation: null }),
+    set({ activeRepoId: repoId, selectedCitation: null, mobileNavOpen: false }),
 
   addMessage: (repoId, message) =>
     set((s) => ({
@@ -75,6 +78,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set) => ({
   selectCitation: (citation) => set({ selectedCitation: citation }),
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setMobileNav: (open) => set({ mobileNavOpen: open }),
 }))
 
 // Selector helper: components subscribe to ONE repo's thread, so a new
