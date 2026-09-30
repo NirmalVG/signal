@@ -1,10 +1,11 @@
 "use client"
 
 import { SignalMark } from "@/components/brand/signal-mark"
-import { StatusDot } from "@/components/workspace/status-dot"
 import { useRepos } from "@/hooks/use-repos"
 import { cn } from "@/lib/utils"
 import { useWorkspaceStore } from "@/store/workspace-store"
+import { StatusDot } from "@/components/workspace/status-dot"
+import { UploadZone } from "@/components/workspace/upload-zone"
 
 export function RepoRail() {
   const collapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
@@ -94,6 +95,8 @@ export function RepoRail() {
             })}
           </ul>
         </div>
+
+        <UploadZone />
       </div>
     </aside>
   )

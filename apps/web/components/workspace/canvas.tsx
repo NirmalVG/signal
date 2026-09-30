@@ -1,6 +1,7 @@
 "use client"
 
 import { FileCode2, Menu, PanelLeft } from "lucide-react"
+import { PipelineStepper } from "@/components/workspace/pipeline-stepper"
 import { StatusDot } from "@/components/workspace/status-dot"
 import { Button } from "@/components/ui/button"
 import { useRepoStatus } from "@/hooks/use-repo-status"
@@ -30,7 +31,10 @@ export function Canvas() {
 
   const repos = useRepos()
   const liveStatus = useRepoStatus(activeRepoId)
-  const repo = repos.data?.find((r) => r.id === activeRepoId)
+  // Fall back to the status query's data: right after an upload, the repo
+  // list hasn't refetched yet, but useIngest already seeded this cache entry
+  // (with the repo name) — so the UI never flashes "Select a repository".
+  const repo = repos.data?.find((r) => r.id === activeRepoId) ?? liveStatus.data
   const status = liveStatus.data?.status ?? repo?.status
 
   return (
@@ -69,13 +73,15 @@ export function Canvas() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[840px] px-4 py-10 md:px-8">
-          {!repo ? (
+          {!repo || !status ? (
             <div className="rounded-xl border border-dashed border-border-strong p-10 text-center">
               <p className="text-base font-semibold">Select a repository</p>
               <p className="mt-1 text-sm text-text-muted">
-                Pick one from the sidebar to start asking questions.
+                Pick one from the sidebar, or drop a .zip to add a new one.
               </p>
             </div>
+          ) : status !== "indexed" ? (
+            <PipelineStepper status={status} repoName={repo.name} />
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-text-muted">
