@@ -3,13 +3,11 @@
 import { SignalMark } from "@/components/brand/signal-mark"
 import { AnswerMarkdown } from "@/components/chat/answer-markdown"
 import { CitationChip } from "@/components/chat/citation-chip"
+import { MatchBadge } from "@/components/chat/match-badge"
 import { cn } from "@/lib/utils"
 import type { ChatMessage } from "@/store/workspace-store"
 
 type Assistant = Extract<ChatMessage, { role: "assistant" }>
-
-// DESIGN.md: teal is reserved for confidence above 90%.
-const VERIFIED_THRESHOLD = 0.9
 
 function formatLatency(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
@@ -32,8 +30,6 @@ function Skeleton() {
 }
 
 export function AssistantMessage({ message }: { message: Assistant }) {
-  const verified = message.confidence >= VERIFIED_THRESHOLD
-
   return (
     <div className="flex gap-3">
       <SignalMark className="mt-1 size-7 shrink-0" />
@@ -80,17 +76,7 @@ export function AssistantMessage({ message }: { message: Assistant }) {
 
               <div className="ml-auto flex shrink-0 items-center gap-1.5 font-mono text-[11px] font-semibold">
                 {message.context.length > 0 && (
-                  <span
-                    title="Similarity of the best-matching code chunk"
-                    className={cn(
-                      "rounded-sm border px-1.5 py-0.5",
-                      verified
-                        ? "border-secondary/25 bg-secondary-container text-on-secondary-container"
-                        : "border-border bg-background text-text-muted",
-                    )}
-                  >
-                    {Math.round(message.confidence * 100)}% match
-                  </span>
+                  <MatchBadge value={message.confidence} />
                 )}
                 <span
                   title="Time to answer"

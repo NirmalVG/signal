@@ -1,4 +1,4 @@
-import type { IngestResponse, QueryResponse, Repo } from "./types"
+import type { IngestResponse, QueryResponse, Repo, RepoFile } from "./types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
@@ -39,6 +39,9 @@ export const api = {
 
   deleteRepo: (repoId: string) =>
     request<{ deleted: string }>(`/repos/${repoId}`, { method: "DELETE" }),
+
+  getRepoFile: (repoId: string, path: string) =>
+    request<RepoFile>(`/repos/${repoId}/file?path=${encodeURIComponent(path)}`),
 
   ingestRepo: (file: File) => {
     // No Content-Type header here on purpose: the browser must set

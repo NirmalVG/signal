@@ -37,6 +37,12 @@ export interface QueryResponse {
   latency_ms: number
 }
 
+export interface RepoFile {
+  path: string
+  content: string
+  line_count: number
+}
+
 // A status is "terminal" when polling can stop — nothing will change it again.
 export const isTerminalStatus = (s: RepoStatus) =>
   s === "indexed" || s === "failed"

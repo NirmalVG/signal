@@ -45,6 +45,13 @@
   --radius-lg: 16px;
   --radius-xl: 24px;
 
+  /* Syntax highlighting — every color meets 4.5:1 contrast on white */
+  --color-syntax-keyword: #4f46e5; /* indigo: language structure */
+  --color-syntax-string: #0f766e; /* teal: literal text, "verified" data */
+  --color-syntax-number: #b45309; /* amber: numbers & booleans */
+  --color-syntax-function: #0f172a; /* ink, semibold: names you read for */
+  --color-syntax-comment: #64748b; /* muted, italic */
+
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
   @keyframes shimmer {
     0% {
