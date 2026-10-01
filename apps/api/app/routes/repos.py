@@ -64,6 +64,12 @@ def get_repo_file(repo_id: str, path: str):
     except ValueError:
         raise HTTPException(status_code=404, detail="Repo not found")
 
+    # Reject null bytes before touching the filesystem. Depending on the
+    # platform, Path.resolve() may leave them intact and is_file() then
+    # reports a missing file instead of treating the request as invalid.
+    if "\x00" in path:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
     extract_path = REPOS_DIR / repo_id
     if not extract_path.is_dir():
         raise HTTPException(status_code=404, detail="Repo not found")
