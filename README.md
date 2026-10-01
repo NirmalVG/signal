@@ -100,12 +100,16 @@ cp .env.example .env                                  # then fill in the values
 uvicorn app.main:app --reload
 ```
 
-| Variable                                    | Purpose                                                               |
-| ------------------------------------------- | --------------------------------------------------------------------- |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Database access (server-side only)                                    |
-| `GROQ_API_KEY`                              | Answer generation                                                     |
-| `JINA_API_KEY`                              | Embeddings                                                            |
-| `CORS_ORIGINS`                              | Comma-separated allowed web origins (default `http://localhost:3000`) |
+| Variable                                        | Purpose                                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------------------- |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`     | Database access (server-side only)                                           |
+| `GROQ_API_KEY`                                  | Answer generation                                                            |
+| `JINA_API_KEY`                                  | Embeddings                                                                   |
+| `CORS_ORIGINS`                                  | Comma-separated allowed web origins (default `http://localhost:3000`)        |
+| `READ_ONLY_MODE`                                | `true` refuses uploads and deletions (public demo). Default `false`          |
+| `TRUSTED_PROXY_HOPS`                            | Reverse proxies in front of the API (`1` on Render/Railway/Fly). Default `0` |
+| `QUERY_RATE_PER_MINUTE`, `INGEST_RATE_PER_HOUR` | Per-IP limits. Defaults `10` and `3`                                         |
+| `DAILY_QUERY_LIMIT`, `DAILY_INGEST_LIMIT`       | Whole-instance daily caps, reset at 00:00 UTC. Defaults `500` and `20`       |
 
 ### 3. Web
 
@@ -135,17 +139,36 @@ pytest
 | `GET`    | `/api/repos/{id}/status`     | Poll indexing status                                                   |
 | `GET`    | `/api/repos/{id}/file?path=` | Read one source file (path-confined, 1 MB cap)                         |
 | `DELETE` | `/api/repos/{id}`            | Delete a repository, its index and files                               |
-| `POST`   | `/api/query`                 | Ask a question, get an answer with citations                           |
+| `POST`   | `/api/query`                 | Ask a question, get an answer with citations (max 2000 characters)     |
+| `GET`    | `/api/config`                | Non-secret flags for the UI (e.g. `read_only`)                         |
 
 ## Deploying
 
 - **Web (Vercel):** set the project root to `apps/web`. Environment: `NEXT_PUBLIC_API_URL` (your API's HTTPS URL) and `NEXT_PUBLIC_SITE_URL` (your site's URL, used for the share image).
-- **API (Render, Railway or Fly):** start with `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Set the variables above, with `CORS_ORIGINS` set to your web URL. Mount a **persistent disk** at `apps/api/data`: uploaded files live there, and without it the code viewer falls back to the indexed snippet after a restart.
+- **API (Render, Railway or Fly):** start with `uvicorn app.main:app --host 0.0.0.0 --port $PORT` (a **single worker**, see the limits note below). Set the variables above, with `CORS_ORIGINS` set to your web URL and `TRUSTED_PROXY_HOPS=1`. Mount a **persistent disk** at `apps/api/data`: uploaded files live there, and without it the code viewer falls back to the indexed snippet after a restart.
 - **HTTPS everywhere:** an HTTPS site cannot call an HTTP API.
+
+### Publishing a safe public demo
+
+1. Deploy with `READ_ONLY_MODE=false`, upload and index a sample repository (Signal's own source works well), and wait for it to finish.
+2. Set `READ_ONLY_MODE=true` and redeploy. Visitors can ask questions, but cannot upload or delete anything.
+3. Set spend caps in the Groq and Jina dashboards as a final backstop.
+
+## Abuse protection
+
+The API has no user accounts, so it protects itself in layers (all in `apps/api/app/core/protection.py`, covered by tests):
+
+1. **Read-only mode** refuses uploads and deletions.
+2. **Per-IP sliding-window limits** on questions and uploads, with `Retry-After` headers.
+3. **Daily caps** on the whole instance, so the bill stays bounded even if traffic comes from many addresses.
+
+It runs as middleware rather than a FastAPI dependency because FastAPI parses an upload before dependencies run, which would let a rejected request still push 200 MB through the server.
 
 ## Known limitations
 
-- **No authentication or rate limiting.** Anyone with the URL can upload and query, which spends your API credits. For a public demo, set spend caps with your providers or add limits before sharing widely.
+- **No user authentication.** Abuse is limited by read-only mode, per-IP limits and daily caps, not by accounts.
+- **Limits live in process memory.** They are exact for a single server process and reset on restart. Running several workers or servers multiplies the budget; use a shared store such as Redis if you scale out.
+- **Per-IP limits can be sidestepped with many addresses.** The daily caps are the backstop for that.
 - **Single tenant.** All repositories are visible to everyone using the instance.
 - **AST chunking covers Python, JavaScript, TypeScript, TSX and Go.** Other languages fall back to doc-style or no chunking.
 - **Citation validation checks file paths only**, not line numbers or factual correctness.
