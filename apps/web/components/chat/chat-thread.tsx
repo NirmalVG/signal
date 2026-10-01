@@ -47,10 +47,10 @@ export function ChatThread({
       <div
         role="log"
         aria-label="Conversation"
-        className="mx-auto w-full max-w-[840px] space-y-6 px-4 py-8 md:px-8"
+        className={`mx-auto flex min-h-full w-full max-w-[840px] flex-col px-4 py-8 md:px-8 ${messages.length === 0 ? "justify-center" : "space-y-6"}`}
       >
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center py-12 text-center">
+          <div className="flex flex-col items-center text-center">
             <SignalMark className="size-12" />
             <h2 className="mt-5 text-2xl font-semibold tracking-tight">
               Ask anything about this codebase

@@ -16,9 +16,17 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Signal — Ask your codebase anything",
+  // Needed so the share image gets an absolute URL. Set NEXT_PUBLIC_SITE_URL
+  // to your deployed address (e.g. https://signal.vercel.app).
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  ),
+  title: {
+    default: "Signal — Ask your codebase. Verify every answer.",
+    template: "%s",
+  },
   description:
-    "An AI-powered RAG assistant that understands a codebase's structure, intent, and history — with cited, verified answers.",
+    "Signal is an AI workspace that answers questions about any repository and cites the exact file and lines behind every claim.",
 }
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,18 +1,44 @@
 "use client"
 
+import { useState } from "react"
+import Link from "next/link"
+import { Trash2 } from "lucide-react"
 import { SignalMark } from "@/components/brand/signal-mark"
+import { StatusDot } from "@/components/workspace/status-dot"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { UploadZone } from "@/components/workspace/upload-zone"
+import { useDeleteRepo } from "@/hooks/use-delete-repo"
 import { useRepos } from "@/hooks/use-repos"
+import type { Repo } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
 import { useWorkspaceStore } from "@/store/workspace-store"
-import { StatusDot } from "@/components/workspace/status-dot"
-import { UploadZone } from "@/components/workspace/upload-zone"
 
 export function RepoRail() {
   const collapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const mobileNavOpen = useWorkspaceStore((s) => s.mobileNavOpen)
   const activeRepoId = useWorkspaceStore((s) => s.activeRepoId)
   const setActiveRepo = useWorkspaceStore((s) => s.setActiveRepo)
+  const clearConversation = useWorkspaceStore((s) => s.clearConversation)
   const repos = useRepos()
+  const deleteRepo = useDeleteRepo()
+  const [target, setTarget] = useState<Repo | null>(null)
+
+  function closeDialog() {
+    setTarget(null)
+    deleteRepo.reset() // clear any previous error for next time
+  }
+
+  function confirmDelete() {
+    if (!target) return
+    const id = target.id
+    deleteRepo.mutate(id, {
+      onSuccess: () => {
+        if (activeRepoId === id) setActiveRepo(null)
+        clearConversation(id)
+        closeDialog()
+      },
+    })
+  }
 
   return (
     <aside
@@ -32,9 +58,11 @@ export function RepoRail() {
       {/* Fixed-width inner wrapper: while the column animates to 0px, the
           content is clipped instead of squashed and re-wrapping. */}
       <div className="flex h-full w-[280px] flex-col">
-        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
-          <SignalMark className="size-7" />
-          <span className="text-[17px] font-bold tracking-tight">Signal</span>
+        <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
+          <Link href="/" className="flex items-center gap-2.5">
+            <SignalMark className="size-7" />
+            <span className="text-[17px] font-bold tracking-tight">Signal</span>
+          </Link>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
@@ -70,12 +98,12 @@ export function RepoRail() {
             {repos.data?.map((repo) => {
               const active = repo.id === activeRepoId
               return (
-                <li key={repo.id}>
+                <li key={repo.id} className="group relative">
                   <button
                     onClick={() => setActiveRepo(repo.id)}
                     aria-current={active ? "true" : undefined}
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors duration-150",
+                      "flex w-full items-center gap-3 rounded-md py-2 pl-3 pr-11 text-left transition-colors duration-150",
                       "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/30",
                       active ? "bg-primary/8" : "hover:bg-surface-hover",
                     )}
@@ -90,6 +118,23 @@ export function RepoRail() {
                       </span>
                     </span>
                   </button>
+
+                  {/* A sibling of the select button, NOT a child: interactive
+                      elements must never be nested inside a <button>. Always
+                      visible on touch screens (no hover there); on desktop it
+                      appears on hover or keyboard focus. */}
+                  <button
+                    onClick={() => setTarget(repo)}
+                    aria-label={`Delete ${repo.name}`}
+                    className={cn(
+                      "absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-text-faint transition-[opacity,background-color,color] duration-150",
+                      "hover:bg-error-container hover:text-error",
+                      "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-error/30",
+                      "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100",
+                    )}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
                 </li>
               )
             })}
@@ -98,6 +143,17 @@ export function RepoRail() {
 
         <UploadZone />
       </div>
+
+      <ConfirmDialog
+        open={target !== null}
+        title="Delete this repository?"
+        description={`"${target?.name ?? ""}" will be removed along with its index and chat history. This can't be undone.`}
+        confirmLabel="Delete"
+        pending={deleteRepo.isPending}
+        error={deleteRepo.error?.message}
+        onConfirm={confirmDelete}
+        onCancel={closeDialog}
+      />
     </aside>
   )
 }
