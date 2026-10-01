@@ -1,4 +1,10 @@
-import type { IngestResponse, QueryResponse, Repo, RepoFile } from "./types"
+import type {
+  AppConfig,
+  IngestResponse,
+  QueryResponse,
+  Repo,
+  RepoFile,
+} from "./types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
@@ -33,6 +39,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  getConfig: () => request<AppConfig>("/config"),
+
   listRepos: () => request<Repo[]>("/repos"),
 
   getRepoStatus: (repoId: string) => request<Repo>(`/repos/${repoId}/status`),

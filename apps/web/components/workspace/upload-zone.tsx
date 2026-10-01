@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, type DragEvent } from "react"
-import { LoaderCircle, TriangleAlert, Upload } from "lucide-react"
+import { Lock, LoaderCircle, TriangleAlert, Upload } from "lucide-react"
+import { useAppConfig } from "@/hooks/use-app-config"
 import { useIngest } from "@/hooks/use-ingest"
 import { cn } from "@/lib/utils"
 import { formatBytes, validateArchive } from "@/lib/validate-upload"
@@ -10,6 +11,7 @@ import { useWorkspaceStore } from "@/store/workspace-store"
 export function UploadZone() {
   const setActiveRepo = useWorkspaceStore((s) => s.setActiveRepo)
   const ingest = useIngest()
+  const { readOnly, ready } = useAppConfig()
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,6 +46,22 @@ export function UploadZone() {
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
       setDragging(false)
     }
+  }
+
+  // Hooks are all above this line; early returns are only legal below them.
+  if (!ready) return null // avoid flashing an upload box that may be hidden
+  if (readOnly) {
+    return (
+      <div className="border-t border-border p-3">
+        <div className="flex flex-col items-center gap-1 rounded-lg border border-border bg-background px-4 py-4 text-center">
+          <Lock className="size-5 text-text-muted" />
+          <span className="text-[13px] font-semibold">Demo mode</span>
+          <span className="text-xs leading-4 text-text-muted">
+            Uploads are turned off here. Explore the sample repository above.
+          </span>
+        </div>
+      </div>
+    )
   }
 
   return (

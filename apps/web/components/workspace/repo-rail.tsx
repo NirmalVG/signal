@@ -7,6 +7,7 @@ import { SignalMark } from "@/components/brand/signal-mark"
 import { StatusDot } from "@/components/workspace/status-dot"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { UploadZone } from "@/components/workspace/upload-zone"
+import { useAppConfig } from "@/hooks/use-app-config"
 import { useDeleteRepo } from "@/hooks/use-delete-repo"
 import { useRepos } from "@/hooks/use-repos"
 import type { Repo } from "@/lib/api/types"
@@ -20,6 +21,7 @@ export function RepoRail() {
   const setActiveRepo = useWorkspaceStore((s) => s.setActiveRepo)
   const clearConversation = useWorkspaceStore((s) => s.clearConversation)
   const repos = useRepos()
+  const { readOnly } = useAppConfig()
   const deleteRepo = useDeleteRepo()
   const [target, setTarget] = useState<Repo | null>(null)
 
@@ -103,7 +105,8 @@ export function RepoRail() {
                     onClick={() => setActiveRepo(repo.id)}
                     aria-current={active ? "true" : undefined}
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-md py-2 pl-3 pr-11 text-left transition-colors duration-150",
+                      "flex w-full items-center gap-3 rounded-md py-2 pl-3 text-left transition-colors duration-150",
+                      readOnly ? "pr-3" : "pr-11",
                       "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/30",
                       active ? "bg-primary/8" : "hover:bg-surface-hover",
                     )}
@@ -123,18 +126,20 @@ export function RepoRail() {
                       elements must never be nested inside a <button>. Always
                       visible on touch screens (no hover there); on desktop it
                       appears on hover or keyboard focus. */}
-                  <button
-                    onClick={() => setTarget(repo)}
-                    aria-label={`Delete ${repo.name}`}
-                    className={cn(
-                      "absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-text-faint transition-[opacity,background-color,color] duration-150",
-                      "hover:bg-error-container hover:text-error",
-                      "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-error/30",
-                      "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100",
-                    )}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  {!readOnly && (
+                    <button
+                      onClick={() => setTarget(repo)}
+                      aria-label={`Delete ${repo.name}`}
+                      className={cn(
+                        "absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-text-faint transition-[opacity,background-color,color] duration-150",
+                        "hover:bg-error-container hover:text-error",
+                        "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-error/30",
+                        "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100",
+                      )}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  )}
                 </li>
               )
             })}

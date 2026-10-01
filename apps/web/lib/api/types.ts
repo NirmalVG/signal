@@ -37,6 +37,11 @@ export interface QueryResponse {
   latency_ms: number
 }
 
+// Non-secret server flags (GET /api/config) the UI adapts itself to.
+export interface AppConfig {
+  read_only: boolean
+}
+
 export interface RepoFile {
   path: string
   content: string
