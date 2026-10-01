@@ -44,3 +44,13 @@ export function languageFromPath(path: string): {
     label: ext ? ext.toUpperCase() : "TEXT",
   }
 }
+
+// Chunk kinds as the backend stores them (chunker.py) → friendly labels.
+const KIND_LABELS: Record<string, string> = {
+  code_semantic: "definition", // one function / class / method
+  code_window: "code window", // a fixed 200-line slice
+}
+
+export function kindLabel(kind: string): string {
+  return KIND_LABELS[kind] ?? kind.replace(/_/g, " ")
+}

@@ -52,6 +52,19 @@
   --color-syntax-function: #0f172a; /* ink, semibold: names you read for */
   --color-syntax-comment: #64748b; /* muted, italic */
 
+  /* Entrance for content that appears (e.g. the hero demo's answer) */
+  --animate-fade-up: fade-up 450ms ease-out both;
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
   @keyframes shimmer {
     0% {
@@ -67,6 +80,11 @@
   color-scheme: light;
 }
 
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem; /* sticky nav height, so anchors don't hide under it */
+}
+
 body {
   background-color: var(--color-background);
 }
@@ -76,6 +94,10 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   ::before,
   ::after {

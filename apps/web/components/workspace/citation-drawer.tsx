@@ -7,7 +7,7 @@ import { CopyButton } from "@/components/code/copy-button"
 import { MatchBadge } from "@/components/chat/match-badge"
 import { Button } from "@/components/ui/button"
 import { useRepoFile } from "@/hooks/use-repo-file"
-import { languageFromPath } from "@/lib/language"
+import { kindLabel, languageFromPath } from "@/lib/language"
 import { cn } from "@/lib/utils"
 import { useWorkspaceStore } from "@/store/workspace-store"
 
@@ -101,7 +101,7 @@ export function CitationDrawer() {
         {shown && (
           <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-4 py-2 font-mono text-[11px] text-text-muted">
             <span className="rounded-sm border border-border bg-background px-1.5 py-0.5 font-semibold text-text">
-              {shown.kind}
+              {kindLabel(shown.kind)}
             </span>
             <span>
               Lines {shown.line_number}–{shown.end_line}
