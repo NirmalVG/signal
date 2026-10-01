@@ -1,0 +1,36 @@
+# Place at the ROOT of your repo (next to apps/ and README.md).
+# Render dashboard -> New -> Blueprint -> pick your repo.
+services:
+  - type: web
+    name: signal-api
+    runtime: python
+    rootDir: apps/api
+    plan: starter # persistent disks need a paid plan; see note below
+    region: singapore # pick the region closest to you AND to your Supabase project
+    buildCommand: pip install -r requirements.txt
+    # Single worker on purpose: rate limits live in process memory.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      - key: READ_ONLY_MODE
+        value: "false"
+      - key: CORS_ORIGINS
+        sync: false # you type this in the dashboard (your Vercel URL)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: JINA_API_KEY
+        sync: false
+    disk:
+      name: signal-data
+      mountPath: /opt/render/project/src/apps/api/data
+      sizeGB: 5
+# FREE PLAN: change `plan: starter` to `plan: free` and delete the whole `disk:` block.
+# Free services cannot attach disks and sleep after 15 min idle.
