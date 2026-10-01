@@ -39,7 +39,9 @@ def chunk_code_file(path: Path, root: Path) -> list[dict]:
     not the absolute extraction path — citations shown to a user should
     never leak internal storage details like a repo_id folder.
     """
-    source_bytes = path.read_bytes()
+    # PostgreSQL text fields reject NUL characters. Match parser.py so code
+    # chunks and semantic definition offsets use the same sanitized source.
+    source_bytes = path.read_bytes().replace(b"\x00", b"")
     lines = source_bytes.decode(errors="ignore").splitlines()
     # .as_posix() forces forward slashes regardless of OS, so citations look
     # identical whether this runs on your Windows dev machine or a Linux host.
@@ -78,7 +80,9 @@ def chunk_doc_file(path: Path, root: Path) -> list[dict]:
     exact blank-line counts when a file has multiple consecutive blank
     lines. Good enough for citing "roughly where this came from."
     """
-    text = path.read_text(encoding="utf-8", errors="ignore")
+    # PostgreSQL text fields cannot contain NUL; remove it before chunking and
+    # embedding document contents as well.
+    text = path.read_text(encoding="utf-8", errors="ignore").replace("\x00", "")
     rel_path = path.relative_to(root).as_posix()
     raw_paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
 

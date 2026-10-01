@@ -41,7 +41,10 @@ def extract_definitions(path: Path) -> list[dict]:
     """Parse a single source file and return its top-level function/class definitions."""
     language = EXTENSION_LANGUAGE_MAP[path.suffix]
     parser = get_parser(language)
-    source_bytes = path.read_bytes()
+    # PostgreSQL text fields cannot store NUL, and some generated or binary-ish
+    # source files contain it. Strip it before parsing so chunk text and AST
+    # byte offsets are based on the same contents that will be indexed.
+    source_bytes = path.read_bytes().replace(b"\x00", b"")
     tree = parser.parse(source_bytes)
 
     def_types = DEFINITION_NODE_TYPES[language]

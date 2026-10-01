@@ -1,10 +1,16 @@
 from fastapi import FastAPI
-from app.core.config import settings
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import health, ingest, repos, query
+from app.core.config import settings
+from app.core.protection import install_protection
+from app.routes import health, ingest, meta, repos, query
 
 app = FastAPI(title="Signal API")
+
+# ORDER MATTERS. The last middleware added is the OUTERMOST one. CORS must wrap
+# protection so that even our early 403/429 responses carry CORS headers;
+# otherwise the browser hides them behind a generic network error.
+install_protection(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api")
+app.include_router(meta.router, prefix="/api")
 app.include_router(ingest.router, prefix="/api")
 app.include_router(repos.router, prefix="/api")
 app.include_router(query.router, prefix="/api")
