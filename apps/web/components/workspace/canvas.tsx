@@ -5,13 +5,16 @@ import { ChatThread } from "@/components/chat/chat-thread"
 import { Composer } from "@/components/chat/composer"
 import { PipelineStepper } from "@/components/workspace/pipeline-stepper"
 import { StatusDot } from "@/components/workspace/status-dot"
-import { Button } from "@/components/ui/button"
 import { useChat } from "@/hooks/use-chat"
 import { useRepoStatus } from "@/hooks/use-repo-status"
 import { useRepos } from "@/hooks/use-repos"
 import { useWorkspaceStore } from "@/store/workspace-store"
+import { Button, buttonVariants } from "@/components/ui/button"
+import type { AuthUser } from "@/lib/auth/user"
+import Link from "next/link"
+import { UserMenu } from "@/components/auth/user-menu"
 
-export function Canvas() {
+export function Canvas({ user }: { user: AuthUser | null }) {
   const activeRepoId = useWorkspaceStore((s) => s.activeRepoId)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setMobileNav = useWorkspaceStore((s) => s.setMobileNav)
@@ -65,6 +68,19 @@ export function Canvas() {
             </span>
           </div>
         )}
+
+        <div className="ml-auto shrink-0">
+          {user ? (
+            <UserMenu user={user} />
+          ) : (
+            <Link
+              href="/login"
+              className={buttonVariants({ variant: "secondary", size: "sm" })}
+            >
+              Sign in
+            </Link>
+          )}
+        </div>
       </header>
 
       <div className="min-h-0 flex-1">

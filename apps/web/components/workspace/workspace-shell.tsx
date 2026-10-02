@@ -6,6 +6,7 @@ import { Canvas } from "@/components/workspace/canvas"
 import { RepoRail } from "@/components/workspace/repo-rail"
 import { cn } from "@/lib/utils"
 import { useWorkspaceStore } from "@/store/workspace-store"
+import type { AuthUser } from "@/lib/auth/user"
 
 // Dimmed backdrop behind overlay panels. Clicking it dismisses the panel.
 function Scrim({
@@ -30,7 +31,7 @@ function Scrim({
   )
 }
 
-export function WorkspaceShell() {
+export function WorkspaceShell({ user }: { user: AuthUser | null }) {
   const collapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const mobileNavOpen = useWorkspaceStore((s) => s.mobileNavOpen)
   const setMobileNav = useWorkspaceStore((s) => s.setMobileNav)
@@ -67,7 +68,7 @@ export function WorkspaceShell() {
       )}
     >
       <RepoRail />
-      <Canvas />
+      <Canvas user={user} />
       <CitationDrawer />
 
       {/* Below md the rail is an overlay; below xl the drawer is one. */}
