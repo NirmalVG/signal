@@ -1,27 +1,40 @@
 "use client"
 
+import { useEffect } from "react"
+import Link from "next/link"
 import { Menu, PanelLeft } from "lucide-react"
+import { UserMenu } from "@/components/auth/user-menu"
 import { ChatThread } from "@/components/chat/chat-thread"
 import { Composer } from "@/components/chat/composer"
 import { PipelineStepper } from "@/components/workspace/pipeline-stepper"
 import { StatusDot } from "@/components/workspace/status-dot"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { useChat } from "@/hooks/use-chat"
 import { useRepoStatus } from "@/hooks/use-repo-status"
 import { useRepos } from "@/hooks/use-repos"
-import { useWorkspaceStore } from "@/store/workspace-store"
-import { Button, buttonVariants } from "@/components/ui/button"
 import type { AuthUser } from "@/lib/auth/user"
-import Link from "next/link"
-import { UserMenu } from "@/components/auth/user-menu"
+import { useWorkspaceStore } from "@/store/workspace-store"
 
 export function Canvas({ user }: { user: AuthUser | null }) {
   const activeRepoId = useWorkspaceStore((s) => s.activeRepoId)
+  const setActiveRepo = useWorkspaceStore((s) => s.setActiveRepo)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setMobileNav = useWorkspaceStore((s) => s.setMobileNav)
+
+  const isGuest = user === null
 
   const repos = useRepos()
   const liveStatus = useRepoStatus(activeRepoId)
   const chat = useChat(activeRepoId)
+
+  // Guests land on a ready-to-ask sample repo instead of an empty
+  // "Select a repository" screen. Runs only for guests, and only while
+  // nothing is selected, so it never overrides a deliberate choice.
+  useEffect(() => {
+    if (!isGuest || activeRepoId) return
+    const sample = repos.data?.find((r) => r.status === "indexed")
+    if (sample) setActiveRepo(sample.id)
+  }, [isGuest, activeRepoId, repos.data, setActiveRepo])
 
   // Fall back to the status query's data: right after an upload, the repo
   // list hasn't refetched yet, but useIngest already seeded this cache entry
@@ -69,6 +82,7 @@ export function Canvas({ user }: { user: AuthUser | null }) {
           </div>
         )}
 
+        {/* Account controls, pushed to the far right */}
         <div className="ml-auto shrink-0">
           {user ? (
             <UserMenu user={user} />
@@ -93,7 +107,9 @@ export function Canvas({ user }: { user: AuthUser | null }) {
                 <div className="rounded-xl border border-dashed border-border-strong p-10 text-center">
                   <p className="text-base font-semibold">Select a repository</p>
                   <p className="mt-1 text-sm text-text-muted">
-                    Pick one from the sidebar, or drop a .zip to add a new one.
+                    {isGuest
+                      ? "Pick a sample repository from the sidebar, or sign in to add your own."
+                      : "Pick one from the sidebar, or drop a .zip to add a new one."}
                   </p>
                 </div>
               ) : (

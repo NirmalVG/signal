@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Trash2 } from "lucide-react"
+import { useAuthUser } from "@/components/auth/auth-provider"
 import { SignalMark } from "@/components/brand/signal-mark"
 import { StatusDot } from "@/components/workspace/status-dot"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
@@ -22,8 +23,13 @@ export function RepoRail() {
   const clearConversation = useWorkspaceStore((s) => s.clearConversation)
   const repos = useRepos()
   const { readOnly } = useAppConfig()
+  const { isGuest } = useAuthUser()
   const deleteRepo = useDeleteRepo()
   const [target, setTarget] = useState<Repo | null>(null)
+
+  // Deleting is only offered to signed-in users, and never on a read-only
+  // instance. (UI only: the API enforces this for real in Steps 8-9.)
+  const canManage = !readOnly && !isGuest
 
   function closeDialog() {
     setTarget(null)
@@ -91,8 +97,15 @@ export function RepoRail() {
 
           {repos.data?.length === 0 && (
             <p className="rounded-lg border border-dashed border-border-strong p-4 text-[13px] leading-[18px] text-text-muted">
-              No repositories yet. Upload a{" "}
-              <code className="font-mono">.zip</code> to start asking questions.
+              {isGuest ? (
+                "No sample repositories are available right now."
+              ) : (
+                <>
+                  No repositories yet. Upload a{" "}
+                  <code className="font-mono">.zip</code> to start asking
+                  questions.
+                </>
+              )}
             </p>
           )}
 
@@ -106,7 +119,8 @@ export function RepoRail() {
                     aria-current={active ? "true" : undefined}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-md py-2 pl-3 text-left transition-colors duration-150",
-                      readOnly ? "pr-3" : "pr-11",
+                      // Leave room for the trash icon only when it exists.
+                      canManage ? "pr-11" : "pr-3",
                       "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/30",
                       active ? "bg-primary/8" : "hover:bg-surface-hover",
                     )}
@@ -126,7 +140,7 @@ export function RepoRail() {
                       elements must never be nested inside a <button>. Always
                       visible on touch screens (no hover there); on desktop it
                       appears on hover or keyboard focus. */}
-                  {!readOnly && (
+                  {canManage && (
                     <button
                       onClick={() => setTarget(repo)}
                       aria-label={`Delete ${repo.name}`}

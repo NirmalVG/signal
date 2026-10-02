@@ -7,6 +7,10 @@ import { useIngest } from "@/hooks/use-ingest"
 import { cn } from "@/lib/utils"
 import { formatBytes, validateArchive } from "@/lib/validate-upload"
 import { useWorkspaceStore } from "@/store/workspace-store"
+import Link from "next/link"
+import { Sparkles /* add to the existing lucide import */ } from "lucide-react"
+import { useAuthUser } from "@/components/auth/auth-provider"
+import { buttonVariants } from "@/components/ui/button"
 
 export function UploadZone() {
   const setActiveRepo = useWorkspaceStore((s) => s.setActiveRepo)
@@ -16,6 +20,8 @@ export function UploadZone() {
   const [error, setError] = useState<string | null>(null)
 
   const uploading = ingest.isPending
+
+  const { isGuest } = useAuthUser()
 
   function handleFile(file: File | undefined) {
     if (!file || uploading) return
@@ -59,6 +65,34 @@ export function UploadZone() {
           <span className="text-xs leading-4 text-text-muted">
             Uploads are turned off here. Explore the sample repository above.
           </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (isGuest) {
+    return (
+      <div className="border-t border-border p-3">
+        <div className="rounded-lg border border-border bg-background p-4 text-center">
+          <span className="mx-auto flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Sparkles className="size-[18px]" />
+          </span>
+          <p className="mt-2.5 text-[13px] font-semibold">
+            Index your own repo
+          </p>
+          <p className="mt-1 text-xs leading-4 text-text-muted">
+            Sign in to upload a .zip and ask questions about your own code.
+          </p>
+          <Link
+            href="/login"
+            className={buttonVariants({
+              variant: "primary",
+              size: "sm",
+              className: "mt-3 w-full",
+            })}
+          >
+            Sign in
+          </Link>
         </div>
       </div>
     )

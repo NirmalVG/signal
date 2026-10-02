@@ -7,6 +7,7 @@ import { RepoRail } from "@/components/workspace/repo-rail"
 import { cn } from "@/lib/utils"
 import { useWorkspaceStore } from "@/store/workspace-store"
 import type { AuthUser } from "@/lib/auth/user"
+import { AuthProvider } from "@/components/auth/auth-provider"
 
 // Dimmed backdrop behind overlay panels. Clicking it dismisses the panel.
 function Scrim({
@@ -57,31 +58,33 @@ export function WorkspaceShell({ user }: { user: AuthUser | null }) {
   } as CSSProperties
 
   return (
-    <div
-      style={style}
-      className={cn(
-        "h-dvh overflow-hidden bg-background",
-        // md–xl: rail + canvas. xl+: rail + canvas + drawer.
-        "md:grid md:grid-cols-[var(--rail-w)_minmax(0,1fr)]",
-        "xl:grid-cols-[var(--rail-w)_minmax(0,1fr)_var(--drawer-w)]",
-        "md:transition-[grid-template-columns] md:duration-300 md:ease-out",
-      )}
-    >
-      <RepoRail />
-      <Canvas user={user} />
-      <CitationDrawer />
+    <AuthProvider user={user}>
+      <div
+        style={style}
+        className={cn(
+          "h-dvh overflow-hidden bg-background",
+          // md–xl: rail + canvas. xl+: rail + canvas + drawer.
+          "md:grid md:grid-cols-[var(--rail-w)_minmax(0,1fr)]",
+          "xl:grid-cols-[var(--rail-w)_minmax(0,1fr)_var(--drawer-w)]",
+          "md:transition-[grid-template-columns] md:duration-300 md:ease-out",
+        )}
+      >
+        <RepoRail />
+        <Canvas user={user} />
+        <CitationDrawer />
 
-      {/* Below md the rail is an overlay; below xl the drawer is one. */}
-      <Scrim
-        visible={mobileNavOpen}
-        onClick={() => setMobileNav(false)}
-        className="md:hidden"
-      />
-      <Scrim
-        visible={citation !== null}
-        onClick={() => selectCitation(null)}
-        className="xl:hidden"
-      />
-    </div>
+        {/* Below md the rail is an overlay; below xl the drawer is one. */}
+        <Scrim
+          visible={mobileNavOpen}
+          onClick={() => setMobileNav(false)}
+          className="md:hidden"
+        />
+        <Scrim
+          visible={citation !== null}
+          onClick={() => selectCitation(null)}
+          className="xl:hidden"
+        />
+      </div>
+    </AuthProvider>
   )
 }
