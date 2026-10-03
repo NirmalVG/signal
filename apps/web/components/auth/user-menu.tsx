@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { useFormStatus } from "react-dom"
 import { ChevronDown, LayoutDashboard, Loader2, LogOut } from "lucide-react"
-import { signOut } from "@/app/auth/actions"
 import type { AuthUser } from "@/lib/auth/user"
+import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
 function Avatar({ user, className }: { user: AuthUser; className?: string }) {
@@ -38,12 +37,28 @@ function Avatar({ user, className }: { user: AuthUser; className?: string }) {
   )
 }
 
-// Separate component because useFormStatus reads the nearest parent <form>.
 function SignOutButton() {
-  const { pending } = useFormStatus()
+  const [pending, setPending] = useState(false)
+
+  async function handleSignOut() {
+    setPending(true)
+    // "local" ends only this browser's session; the default ("global") would
+    // also sign you out on your phone and every other device.
+    const { error } = await createClient().auth.signOut({ scope: "local" })
+    if (error) {
+      setPending(false) // e.g. offline: stay signed in so you can try again
+      return
+    }
+    // A full page load, on purpose. It throws away everything held in memory
+    // (the React Query cache, the selected repo), so the next person at this
+    // browser never sees the previous user's repository names.
+    window.location.assign("/")
+  }
+
   return (
     <button
-      type="submit"
+      type="button"
+      onClick={handleSignOut}
       disabled={pending}
       className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-text-muted transition-colors duration-150 hover:bg-error-container hover:text-error focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-error/30 disabled:opacity-60"
     >
@@ -123,9 +138,7 @@ export function UserMenu({
             </Link>
           )}
 
-          <form action={signOut}>
-            <SignOutButton />
-          </form>
+          <SignOutButton />
         </div>
       )}
     </div>

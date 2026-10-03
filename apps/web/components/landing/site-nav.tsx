@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { MarkGithubIcon } from "@primer/octicons-react"
-import { UserMenu } from "@/app/auth/user-menu"
+import { UserMenu } from "@/components/auth/user-menu"
 import { SignalMark } from "@/components/brand/signal-mark"
 import { buttonVariants } from "@/components/ui/button"
 import { getAuthUser } from "@/lib/auth/user"
