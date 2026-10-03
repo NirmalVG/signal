@@ -2,12 +2,13 @@
 
 import shutil
 from pathlib import Path
-import uuid
 
 from fastapi import APIRouter, HTTPException
 
+from app.core.access import get_repo_for
+from app.core.auth import OptionalUser, RequiredUser
 from app.core.supabase import supabase
-from app.routes.ingest import find_repo_root 
+from app.routes.ingest import find_repo_root
 
 router = APIRouter()
 
@@ -16,30 +17,23 @@ MAX_PREVIEW_BYTES = 1024 * 1024
 
 
 @router.get("/repos")
-def list_repos():
-    result = (
-        supabase.table("repos")
-        .select("*")
-        .order("ingested_at", desc=True)
-        .execute()
-    )
-    return result.data
+def list_repos(user: OptionalUser):
+    query = supabase.table("repos").select("*")
+    # Signed in -> exactly your own uploads. Guest -> only the shared demo.
+    query = query.eq("user_id", user.id) if user else query.eq("is_demo", True)
+    return query.order("ingested_at", desc=True).execute().data
 
 
 @router.get("/repos/{repo_id}/status")
-def get_repo_status(repo_id: str):
-    result = supabase.table("repos").select("*").eq("id", repo_id).execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Repo not found")
-    return result.data[0]
+def get_repo_status(repo_id: str, user: OptionalUser):
+    return get_repo_for(repo_id, user)
 
 
 @router.delete("/repos/{repo_id}")
-def delete_repo(repo_id: str):
-    # Verify the repo exists before doing anything destructive.
-    result = supabase.table("repos").select("id").eq("id", repo_id).execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Repo not found")
+def delete_repo(repo_id: str, user: RequiredUser):
+    # 404 unless the repo is YOURS. The shared demo has no owner, so nobody
+    # can delete it through the API.
+    get_repo_for(repo_id, user)
 
     # Delete related rows first (chunks, queries), then the repo itself.
     supabase.table("chunks").delete().eq("repo_id", repo_id).execute()
@@ -53,16 +47,14 @@ def delete_repo(repo_id: str):
     return {"deleted": repo_id}
 
 @router.get("/repos/{repo_id}/file")
-def get_repo_file(repo_id: str, path: str):
+def get_repo_file(repo_id: str, path: str, user: OptionalUser):
     """
     Return one source file from an extracted repo so the UI can show a
     citation in context. `path` is user-controlled input — treat it as hostile.
     """
-    # 1. repo_id must be a real UUID, so it can never smuggle in "../".
-    try:
-        uuid.UUID(repo_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Repo not found")
+    # 1. The caller must be allowed to see this repo at all. This also checks
+    #    that repo_id is a real UUID, so it can never smuggle in "../".
+    get_repo_for(repo_id, user)
 
     # Reject null bytes before touching the filesystem. Depending on the
     # platform, Path.resolve() may leave them intact and is_file() then

@@ -12,8 +12,18 @@ create table if not exists repos (
   name         text not null,
   status       text not null default 'processing'
                check (status in ('processing', 'extracted', 'indexing', 'indexed', 'failed')),
-  ingested_at  timestamptz
+  ingested_at  timestamptz,
+  -- Owner of an uploaded repo. NULL for the shared demo.
+  user_id      uuid references auth.users (id) on delete cascade,
+  -- The one repo every guest can explore.
+  is_demo      boolean not null default false,
+  -- A repo is either someone's or the shared demo, never both.
+  constraint repos_owner_xor_demo check (not (is_demo and user_id is not null))
 );
+
+create index if not exists repos_user_id_idx on repos (user_id);
+-- At most one demo repo.
+create unique index if not exists repos_single_demo_idx on repos (is_demo) where is_demo;
 
 create table if not exists chunks (
   id           bigint generated always as identity primary key,
@@ -68,3 +78,18 @@ as $$
   order by c.embedding <=> query_embedding
   limit match_count;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Access control
+-- The API reaches these tables with the service_role key (bypasses RLS) and
+-- enforces ownership itself (app/core/access.py). RLS with NO policies shuts
+-- the public REST endpoint, which the browser-visible key can otherwise reach.
+-- See sql/migrations/002_repo_ownership.sql.
+-- ---------------------------------------------------------------------------
+alter table repos   enable row level security;
+alter table chunks  enable row level security;
+alter table queries enable row level security;
+
+revoke all on table repos, chunks, queries from anon, authenticated;
+revoke execute on function match_chunks(vector, uuid, int) from public, anon, authenticated;
+grant  execute on function match_chunks(vector, uuid, int) to service_role;

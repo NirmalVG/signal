@@ -3,6 +3,8 @@
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.core.access import get_repo_for
+from app.core.auth import OptionalUser
 from app.services.answering import answer_question
 
 
@@ -16,5 +18,8 @@ class QueryRequest(BaseModel):
 
 
 @router.post("/query")
-def query_repo(payload: QueryRequest):
+def query_repo(payload: QueryRequest, user: OptionalUser):
+    # 404 unless this repo is yours (signed in) or the demo (guest). Without
+    # this, anyone could ask questions about, and read chunks of, any repo id.
+    get_repo_for(payload.repo_id, user)
     return answer_question(payload.repo_id, payload.question)

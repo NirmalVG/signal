@@ -16,6 +16,7 @@ from starlette import formparsers
 from app.core import protection
 from app.core.config import settings
 from app.core.protection import DailyCounter, SlidingWindowLimiter, client_ip
+from tests.fakes import FakeSupabase, install_stubs
 
 
 class FakeClock:
@@ -135,20 +136,15 @@ def test_ip_falls_back_to_the_peer_when_the_header_is_missing_or_too_short():
 # --------------------------------------------------------------------------
 # The real app, end to end
 # --------------------------------------------------------------------------
+DEMO_ID = "d0000000-0000-4000-8000-000000000000"
+
+
 @pytest.fixture
 def client(monkeypatch):
-    stubs = {
-        "app.core.supabase": {"supabase": None},
-        "app.services.indexer": {"run_indexing": lambda *a, **k: None, "search_chunks": lambda *a, **k: []},
-        "app.services.answering": {"answer_question": lambda repo_id, q: {"answer": "ok", "context": [], "confidence": 0.0, "latency_ms": 1}},
-    }
-    for name, attrs in stubs.items():
-        module = types.ModuleType(name)
-        for key, value in attrs.items():
-            setattr(module, key, value)
-        monkeypatch.setitem(sys.modules, name, module)
-    for name in [n for n in sys.modules if n == "app.main" or n.startswith("app.routes")]:
-        monkeypatch.delitem(sys.modules, name)
+    db = FakeSupabase([
+        {"id": DEMO_ID, "name": "demo", "status": "indexed", "user_id": None, "is_demo": True}
+    ])
+    install_stubs(monkeypatch, db)
 
     monkeypatch.setattr(protection, "limiter", SlidingWindowLimiter(FakeClock()))
     monkeypatch.setattr(protection, "daily", DailyCounter())
@@ -166,7 +162,7 @@ def client(monkeypatch):
 
 
 def ask(client, **kw):
-    return client.post("/api/query", json={"repo_id": "r", "question": "hi"}, **kw)
+    return client.post("/api/query", json={"repo_id": DEMO_ID, "question": "hi"}, **kw)
 
 
 def test_query_is_rate_limited_per_ip_with_retry_after(client):

@@ -8,6 +8,7 @@ from pathlib import Path
 import aiofiles
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 
+from app.core.auth import RequiredUser
 from app.core.supabase import supabase
 from app.services.indexer import run_indexing
 
@@ -45,7 +46,11 @@ def find_repo_root(extract_path: Path) -> Path:
 
 
 @router.post("/ingest")
-async def ingest_repo(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def ingest_repo(
+    background_tasks: BackgroundTasks,
+    user: RequiredUser,
+    file: UploadFile = File(...),
+):
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are accepted")
 
@@ -64,8 +69,9 @@ async def ingest_repo(background_tasks: BackgroundTasks, file: UploadFile = File
                 raise HTTPException(status_code=413, detail="Archive too large")
             await out_file.write(chunk)
 
+    # The uploader becomes the owner: only they will ever see this repo.
     supabase.table("repos").insert(
-        {"id": repo_id, "name": repo_name, "status": "processing"}
+        {"id": repo_id, "name": repo_name, "status": "processing", "user_id": user.id}
     ).execute()
 
     extract_path = EXTRACT_DIR / repo_id

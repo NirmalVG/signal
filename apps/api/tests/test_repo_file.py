@@ -6,8 +6,6 @@ must be rejected. These tests need no database or API keys: the modules that
 talk to Supabase / embedding services are stubbed out.
 """
 import os
-import sys
-import types
 import uuid
 from pathlib import Path
 
@@ -15,23 +13,23 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from tests.fakes import FakeSupabase, install_stubs
+
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
-    supabase_stub = types.ModuleType("app.core.supabase")
-    supabase_stub.supabase = None
-    indexer_stub = types.ModuleType("app.services.indexer")
-    indexer_stub.run_indexing = lambda *a, **k: None
-    monkeypatch.setitem(sys.modules, "app.core.supabase", supabase_stub)
-    monkeypatch.setitem(sys.modules, "app.services.indexer", indexer_stub)
-    for name in ("app.routes.repos", "app.routes.ingest"):
-        monkeypatch.delitem(sys.modules, name, raising=False)
+    repo_id = str(uuid.uuid4())
+    # The repo is the shared demo, so the guest requests below are allowed to
+    # see it; ownership rules have their own tests in test_ownership.py.
+    db = FakeSupabase([
+        {"id": repo_id, "name": "my-repo", "status": "indexed", "user_id": None, "is_demo": True}
+    ])
+    install_stubs(monkeypatch, db)
 
     from app.routes import repos
 
     monkeypatch.setattr(repos, "REPOS_DIR", tmp_path)
 
-    repo_id = str(uuid.uuid4())
     root = tmp_path / repo_id / "my-repo"  # one wrapper folder, like a real zip
     (root / "app" / "(auth)").mkdir(parents=True)
     (root / "app" / "main.py").write_text("print('hi')\n")
