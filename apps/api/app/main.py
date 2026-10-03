@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.protection import install_protection
-from app.routes import health, ingest, meta, repos, query
+from app.routes import health, ingest, me, meta, repos, query
 
 app = FastAPI(title="Signal API")
 
@@ -22,6 +22,7 @@ app.add_middleware(
 
 app.include_router(health.router, prefix="/api")
 app.include_router(meta.router, prefix="/api")
+app.include_router(me.router, prefix="/api")
 app.include_router(ingest.router, prefix="/api")
 app.include_router(repos.router, prefix="/api")
 app.include_router(query.router, prefix="/api")

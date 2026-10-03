@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Public-demo switch: when true, uploads and deletions are refused, so
     # strangers can query the pre-indexed repo but cannot change anything.
     read_only_mode: bool = False
+    # Only for LEGACY Supabase projects that sign tokens with a shared secret
+    # (HS256). Projects on asymmetric signing keys leave this empty.
+    supabase_jwt_secret: str = ""
 
     class Config:
         env_file = ".env"

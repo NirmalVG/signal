@@ -231,8 +231,9 @@ def test_config_endpoint_reports_writable_by_default(client):
     assert client.get("/api/config").json() == {"read_only": False}
 
 
-def test_oversized_upload_is_refused_from_the_header_alone(client):
+def test_oversized_upload_is_refused_from_the_header_alone(client, make_token):
     res = client.post("/api/ingest", content=b"x", headers={
+        "Authorization": f"Bearer {make_token()}",
         "Content-Type": "multipart/form-data; boundary=x",
         "Content-Length": str(protection.MAX_REQUEST_BYTES + 1),
     })
@@ -252,4 +253,47 @@ def test_rejected_upload_body_is_never_parsed(client, monkeypatch):
     monkeypatch.setattr(settings, "read_only_mode", True)
     big = {"file": ("repo.zip", io.BytesIO(b"a" * 2_000_000), "application/zip")}
     assert client.post("/api/ingest", files=big).status_code == 403
+    assert calls["n"] == 0
+
+
+# --------------------------------------------------------------------------
+# Sign-in requirement for uploads and deletes
+# --------------------------------------------------------------------------
+def test_guests_cannot_upload_or_delete(client):
+    zipfile = {"file": ("repo.zip", io.BytesIO(b"PK"), "application/zip")}
+    res = client.post("/api/ingest", files=zipfile)
+    assert res.status_code == 401
+    assert "Sign in" in res.json()["detail"]
+    assert client.delete("/api/repos/abc").status_code == 401
+
+
+def test_guests_can_still_ask_questions(client):
+    assert ask(client).status_code == 200
+
+
+def test_an_expired_session_cannot_delete(client, make_token):
+    expired = make_token(expires_in=-10)
+    res = client.delete("/api/repos/abc", headers={"Authorization": f"Bearer {expired}"})
+    assert res.status_code == 401
+    assert "expired" in res.json()["detail"]
+
+
+def test_anonymous_requests_never_spend_the_daily_upload_budget(client):
+    for _ in range(5):
+        client.delete("/api/repos/abc")
+        client.post("/api/ingest", files={"file": ("r.zip", io.BytesIO(b"PK"), "application/zip")})
+    assert protection.daily._counts.get("ingest", 0) == 0
+
+
+def test_rejected_anonymous_upload_body_is_never_parsed(client, monkeypatch):
+    calls = {"n": 0}
+    original = formparsers.MultiPartParser.parse
+
+    async def spy(self):
+        calls["n"] += 1
+        return await original(self)
+
+    monkeypatch.setattr(formparsers.MultiPartParser, "parse", spy)
+    big = {"file": ("repo.zip", io.BytesIO(b"a" * 2_000_000), "application/zip")}
+    assert client.post("/api/ingest", files=big).status_code == 401
     assert calls["n"] == 0

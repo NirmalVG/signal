@@ -31,8 +31,10 @@ from typing import Callable
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.core.auth import AuthError, authenticate
 from app.core.config import settings
 
 # Keep in sync with MAX_UPLOAD_BYTES in routes/ingest.py (200 MB), plus 1 MB of
@@ -157,6 +159,17 @@ async def protect(request: Request, call_next):
 
     if action in ("ingest", "delete") and settings.read_only_mode:
         return _reject(403, "This is a read-only demo: uploads and deletions are disabled.")
+
+    if action in ("ingest", "delete"):
+        # Guests may look around and ask questions; CHANGING data needs an
+        # account. Checked before the size and rate checks below so that
+        # anonymous junk can never spend the instance-wide daily budget.
+        try:
+            user = await run_in_threadpool(authenticate, request)
+        except AuthError as exc:
+            return _reject(401, str(exc))
+        if user is None:
+            return _reject(401, "Sign in to upload or delete repositories.")
 
     if action == "ingest":
         declared = request.headers.get("content-length", "")
