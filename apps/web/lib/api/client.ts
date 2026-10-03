@@ -1,3 +1,4 @@
+import { createClient } from "@/lib/supabase/client"
 import type {
   AppConfig,
   IngestResponse,
@@ -21,7 +22,21 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}/api${path}`, init)
+  // Attach the signed-in user's access token, if there is one. getSession()
+  // reads it from the auth cookies and refreshes it first when it's about to
+  // expire. Guests have no session, so they send no Authorization header.
+  const supabase = createClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  // Headers (not a plain object) so any headers the caller passed are kept,
+  // and so we never touch Content-Type: for FormData uploads the browser must
+  // set `multipart/form-data; boundary=...` itself.
+  const headers = new Headers(init?.headers)
+  if (session) headers.set("Authorization", `Bearer ${session.access_token}`)
+
+  const res = await fetch(`${API_URL}/api${path}`, { ...init, headers })
 
   if (!res.ok) {
     // FastAPI puts human-readable errors in `detail`; fall back to raw text.
