@@ -1,0 +1,16 @@
+name: Keep Alive
+# Runs every 14 minutes to prevent Render from sleeping (free tier sleeps after 15 min idle)
+on:
+  schedule:
+    - cron: "*/14 * * * *"
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      # Ping the Render web service
+      - name: Ping Render /api/health
+        run: |
+          echo "Pinging Render..."
+          curl -sf --max-time 30 https://signal-api.onrender.com/api/health || echo "Render ping failed (may be cold-starting)"
