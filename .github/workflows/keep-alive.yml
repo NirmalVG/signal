@@ -1,5 +1,6 @@
 name: Keep Alive
 # Runs every 14 minutes to prevent Render from sleeping (free tier sleeps after 15 min idle)
+# Also pings Supabase every 6 days to prevent free-tier pause (pauses after 7 days idle)
 on:
   schedule:
     - cron: "*/14 * * * *"
@@ -14,3 +15,13 @@ jobs:
         run: |
           echo "Pinging Render..."
           curl -sf --max-time 30 https://signal-api.onrender.com/api/health || echo "Render ping failed (may be cold-starting)"
+
+      # Ping Supabase to prevent free-tier pause (7-day inactivity limit)
+      - name: Ping Supabase
+        run: |
+          echo "Pinging Supabase..."
+          curl -sf --max-time 30 \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "https://tihtntqkfmatuzlwoetp.supabase.co/rest/v1/" \
+            || echo "Supabase ping failed (may be paused)"
