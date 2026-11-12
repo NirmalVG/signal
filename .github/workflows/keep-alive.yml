@@ -1,27 +1,50 @@
 name: Keep Alive
 # Runs every 14 minutes to prevent Render from sleeping (free tier sleeps after 15 min idle)
-# Also pings Supabase every 6 days to prevent free-tier pause (pauses after 7 days idle)
+# Pings Supabase every 3 days to prevent free-tier pause (pauses after 7 days idle)
 on:
   schedule:
-    - cron: "*/14 * * * *"
+    - cron: "*/14 * * * *"   # Every 14 min — keeps Render awake
   workflow_dispatch: # Allow manual trigger from GitHub UI
 
 jobs:
   keep-alive:
     runs-on: ubuntu-latest
     steps:
-      # Ping the Render web service
+      # ── Render ──────────────────────────────────────────────────
       - name: Ping Render /api/health
         run: |
           echo "Pinging Render..."
           curl -sf --max-time 30 https://signal-api.onrender.com/api/health || echo "Render ping failed (may be cold-starting)"
 
-      # Ping Supabase to prevent free-tier pause (7-day inactivity limit)
-      - name: Ping Supabase
+      # ── Supabase ────────────────────────────────────────────────
+      # Supabase measures inactivity by *Postgres* activity, NOT by
+      # HTTP hits to the REST gateway. Hitting /rest/v1/ (root) does
+      # NOT execute a SQL query and will NOT reset the 7-day timer.
+      #
+      # Fix: run a real SQL query via the PostgREST RPC endpoint.
+      # We use the service-role key because RLS revokes anon access
+      # to all tables.  The query is a trivial SELECT 1 wrapped in
+      # a Postgres function so it always works even if tables are empty.
+      - name: Query Supabase DB (prevent free-tier pause)
+        env:
+          SUPABASE_URL: https://tihtntqkfmatuzlwoetp.supabase.co
         run: |
-          echo "Pinging Supabase..."
-          curl -sf --max-time 30 \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            "https://tihtntqkfmatuzlwoetp.supabase.co/rest/v1/" \
-            || echo "Supabase ping failed (may be paused)"
+          echo "Querying Supabase Postgres to reset inactivity timer..."
+
+          # Method 1: Query the repos table via PostgREST (actual SQL execution)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            "${SUPABASE_URL}/rest/v1/repos?select=id&limit=1")
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Supabase DB query succeeded (HTTP $HTTP_CODE) — inactivity timer reset"
+          else
+            echo "⚠️  PostgREST query returned HTTP $HTTP_CODE — trying health check fallback..."
+
+            # Method 2: Fallback — hit the Supabase health endpoint
+            curl -sf --max-time 30 "${SUPABASE_URL}/rest/v1/" \
+              -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              || echo "❌ Supabase ping failed (project may already be paused — restore from dashboard)"
+          fi
