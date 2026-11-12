@@ -10,6 +10,16 @@ logger = logging.getLogger(__name__)
 EMBEDDING_DIM = 1024
 BATCH_SIZE = 128
 
+# Jina v3 accepts up to ~8 192 tokens per input.  A safe character limit
+# (assuming ~4 chars/token on average for code) keeps every chunk within
+# that budget.  Chunks that exceed this are truncated — embedding the first
+# N chars still captures the file's purpose for similarity search.
+_MAX_CHARS_PER_INPUT = 8000
+
+# Maximum number of texts to send in a single Jina API call.  Sending too
+# many at once (especially large ones) triggers a 400 from the API.
+_JINA_BATCH_SIZE = 16
+
 # ---------------------------------------------------------------------------
 # Jina AI (primary) — https://jina.ai/embeddings/
 # ---------------------------------------------------------------------------
@@ -25,8 +35,13 @@ _JINA_TASK_MAP = {
 }
 
 
-def _embed_jina(texts: list[str], input_type: str) -> Optional[list[list[float]]]:
-    """Call Jina AI embeddings API.  Returns None on any failure."""
+def _truncate_texts(texts: list[str]) -> list[str]:
+    """Truncate texts that exceed Jina's per-input token limit."""
+    return [t[:_MAX_CHARS_PER_INPUT] if len(t) > _MAX_CHARS_PER_INPUT else t for t in texts]
+
+
+def _embed_jina_batch(texts: list[str], input_type: str) -> Optional[list[list[float]]]:
+    """Call Jina AI embeddings API for a single batch.  Returns None on any failure."""
     api_key = settings.jina_api_key
     if not api_key:
         return None
@@ -41,7 +56,7 @@ def _embed_jina(texts: list[str], input_type: str) -> Optional[list[list[float]]
                 "task": _JINA_TASK_MAP.get(input_type, "retrieval.passage"),
                 "dimensions": EMBEDDING_DIM,
             },
-            timeout=60.0,
+            timeout=120.0,
         )
         if resp.status_code == 429 or resp.status_code >= 500:
             logger.warning("Jina API returned %s — falling back to local model", resp.status_code)
@@ -56,6 +71,39 @@ def _embed_jina(texts: list[str], input_type: str) -> Optional[list[list[float]]
     except (httpx.HTTPError, KeyError, Exception) as exc:
         logger.warning("Jina API error (%s) — falling back to local model", exc)
         return None
+
+
+def _embed_jina(texts: list[str], input_type: str) -> Optional[list[list[float]]]:
+    """
+    Embed via Jina, batching requests and truncating oversized inputs.
+
+    Returns None only if the very first batch fails (signals caller to
+    fall back to the local model).  Subsequent batch failures are retried
+    once; if they still fail the whole call returns None to stay consistent.
+    """
+    texts = _truncate_texts(texts)
+    all_embeddings: list[list[float]] = []
+
+    for i in range(0, len(texts), _JINA_BATCH_SIZE):
+        batch = texts[i : i + _JINA_BATCH_SIZE]
+        result = _embed_jina_batch(batch, input_type)
+        if result is None:
+            # If the very first batch already failed, signal total failure
+            # so the caller can fall back to the local model.
+            if i == 0:
+                return None
+            # Otherwise retry once before giving up entirely.
+            result = _embed_jina_batch(batch, input_type)
+            if result is None:
+                logger.error(
+                    "Jina batch %d-%d failed on retry — aborting embedding",
+                    i, i + len(batch),
+                )
+                return None
+        all_embeddings.extend(result)
+        logger.debug("Jina batch %d-%d done (%d/%d)", i, i + len(batch), len(all_embeddings), len(texts))
+
+    return all_embeddings
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +127,7 @@ def _get_local_model():
 def _embed_local(texts: list[str], input_type: str) -> list[list[float]]:
     """Embed using the local sentence-transformers model."""
     model = _get_local_model()
+    texts = _truncate_texts(texts)
 
     if input_type == "query":
         texts = [_LOCAL_QUERY_PREFIX + t for t in texts]
